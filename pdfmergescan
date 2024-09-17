@@ -1,0 +1,71 @@
+#!/bin/sh
+#
+# pdfmergescan: merge PDF files with odd and even pages (see below)
+# Copyright (C) 2024 Per Cederqvist
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+# 02110-1301 USA.
+
+# WHAT THIS DOES
+#
+# If you have a scanner with a feeder that only scans one side of the
+# pages (and generates a PDF file), and a stack of paper with print on
+# both sides, this script is for you.
+#
+# Scan the front side of all the pages to one PDF file.  Flip the
+# stack of paper and scan the back sides to another PDF file.  This
+# script can extract the pages and combine them in the proper order to
+# a single PDF file.
+
+set -e
+
+if [ $# -ne 3 ]
+then
+    echo usage: $0 front.pdf back.pdf combined.pdf >&2
+    exit 1
+fi
+
+FRONT="$1"
+BACK="$2"
+COMBINED="$3"
+
+if [ -e "$COMBINED" ]
+then
+    echo cowardly refusing to overwrite "$COMBINED" >&2
+    exit 1
+fi
+
+FRONTDIR=`mktemp -d`
+BACKDIR=`mktemp -d`
+trap "rm -r $FRONTDIR $BACKDIR" 0
+
+pdfseparate "$FRONT" $FRONTDIR/%d.pdf
+pdfseparate "$BACK" $BACKDIR/%d.pdf
+
+pages=`ls $FRONTDIR | wc -l`
+
+if [ `ls $BACKDIR | wc -l` -ne $pages ]
+then
+    echo "$FRONT and $BACK must have the same number of pages" >&2
+    exit 1
+fi
+
+args=""
+for p in `seq $pages`
+do
+    rp=`expr $pages - $p + 1`
+    args="$args $FRONTDIR/$p.pdf $BACKDIR/$rp.pdf"
+done
+pdfunite $args "$COMBINED"
