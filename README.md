@@ -7,3 +7,11 @@ If you have a scanner with a document feeder that generates PDF files, but only 
 ``` sh
 $ ./pdfmergescan front.pdf back.pdf combined.pdf
 ```
+
+If the last page is blank, you may want to use the --skip-last option:
+
+``` sh
+$ ./pdfmergescan --skip-last front.pdf back.pdf combined.pdf
+```
+
+This will result in a PDF file with an odd number of pages.
