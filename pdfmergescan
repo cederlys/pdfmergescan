@@ -31,24 +31,50 @@
 
 set -e
 
+FRONT=
+BACK=
+COMBINED=
 SKIP_LAST=false
-if [ "$1" = --skip-last ]
-then
-    SKIP_LAST=true
-    shift
-fi
+while [ $# -gt 1 ]
+do
+    case "x$1" in
+	x--skip-last)
+	    SKIP_LAST=true
+	    shift
+	    ;;
+	x-o)
+	    shift
+	    if [ $# -lt 1 ]
+	    then
+		echo "$0: missing filename for -o" >&2
+		exit 1
+	    fi
+	    COMBINED="$1"
+	    shift
+	    ;;
+	*)
+	    if [ -z "$FRONT" ]
+	    then
+		FRONT="$1"
+		shift
+	    elif [ -z "$BACK" ]
+	    then
+		BACK="$1"
+		shift
+	    else
+		echo "$0: too many args" >&2
+		exit 1
+	    fi
+    esac
+done
 
-if [ $# -ne 3 ]
+if [ -z "$BACK" ] || [ -z "$COMBINED" ]
 then
-    echo "usage: $0 [ --skip-last ] front.pdf back.pdf combined.pdf" >&2
+    echo "usage: $0 [ --skip-last ] front.pdf back.pdf -o combined.pdf" >&2
     echo "  --skip-last  Omit the final page from the result.  This is" >&2
     echo "               useful if the last page is blank." >&2
     exit 1
 fi
-
-FRONT="$1"
-BACK="$2"
-COMBINED="$3"
 
 if [ -e "$COMBINED" ]
 then
