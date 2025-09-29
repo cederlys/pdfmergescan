@@ -1,0 +1,160 @@
+#!/bin/sh
+#
+# pdfsplit: opinionated PDF splitter with preview generation
+# Copyright (C) 2025 Per Cederqvist
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+# 02110-1301 USA.
+
+# WHAT THIS DOES
+#
+# Sometimes when you try to scan the front and back pages, in
+# preparation for using pdfmergescan, there are issues. Maybe the
+# feeder grabs two pages at once. Maybe the stack of paper is so large
+# that you need to split it in two. Maybe some page was got stuck.
+#
+# This script assumes you are working inside a temporary directory,
+# where you have a bunch of PDF files names scan????.pdf (where each
+# "?" is a single digit). It assumes there are at most 99 pages in
+# each PDF file. It will split each file into separate PDF files, with
+# a single page in each, named scan????-??.pdf. It will generate a
+# small preview jpg image of each PDF file, and a index.html page that
+# loads all those pages, in order. In the middle, it will insert a
+# MIDDLE SPACER image (which is just a copy of the first page).
+#
+# All the pages before the MIDDLE SPACER will be collected in odd.pdf,
+# and all the pages after in even.pdf.
+#
+# You can load index.html in a browser and quickly preview the
+# scan. If you need to correct the order, just rename the
+# scan????-??.pdf files to get the desired order, and then re-run this
+# script. Once you are happy with the result, run pdfmergescan on the
+# odd.pdf and even.pdf files, and you should get a nice PDF file of
+# your double-sided input
+#
+# Note: after successfully splitting each input scan????.pdf file,
+# that file is removed. It is recommended that you work in an empty
+# directory, and that you copy your scanned images into that
+# directory.
+
+if [ -f odd.pdf ] || [ -f even.pdf ] || [ -f index.html ]
+then
+    echo Refusing to clobber odd.pdf, even.pdf or index.html >&2
+    exit 1
+fi
+
+for i in scan[0-9][0-9][0-9][0-9].pdf
+do
+    if [ "$i" != 'scan[0-9][0-9][0-9][0-9].pdf' ]
+    then
+	pdfseparate $i `basename $i .pdf`-%02d0.pdf && rm $i
+    fi
+done
+
+cat >index.html <<EOF
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+<title>FIXME</title>
+<style type="text/css">
+span.box {
+    float: left;
+    display: inline-table;
+}
+span.imgrow {
+    display: table-row;
+}
+span.imgcell {
+    display: table-cell;
+    vertical-align: middle;
+    padding: 10px;
+}
+span.captionrow {
+    display: table-row;
+}
+span.captioncell {
+    display: table-cell;
+}
+p {
+    clear: both;
+}
+p.imgpar {
+    text-align: center;
+}
+body {
+    background-color: black;
+    color: yellow;
+}
+:link {
+    color: rgb(150, 200, 255);
+}
+:active {
+    color: red;
+}
+:visited {
+    color: blue;
+}
+</style>
+</head>
+<body>
+<p class="imgpar">
+EOF
+
+tot=`ls -1 scan*-*.pdf | wc -l`
+mid=`expr $tot / 2`
+n=0
+first=
+files=
+for i in scan*-*.pdf
+do
+    bn=`basename $i .pdf`
+    pdftoppm -jpeg -r 30 $i $bn
+    if [ -z "$first" ]
+    then
+	first=$bn-1.jpg
+    fi
+    cat >>index.html <<EOF
+<span class="box">
+<span class="imgrow">
+<span class="imgcell"><img src="$bn-1.jpg" alt="" /></a></span>
+</span>
+<span class="captionrow">
+<span class="captioncell">$i<br>$n/$tot</span>
+</span></span>
+EOF
+    n=`expr $n + 1`
+    files="$files $i"
+    if [ $n -eq $mid ]
+    then
+	pdfunite $files odd.pdf
+	files=
+	cat >>index.html <<EOF
+<span class="box">
+<span class="imgrow">
+<span class="imgcell"><img src="$first" alt="" /></a></span>
+</span>
+<span class="captionrow">
+<span class="captioncell">MIDDLE<br>SPACER</span>
+</span></span>
+EOF
+    fi
+done
+pdfunite $files even.pdf
+cat >>index.html <<EOF
+</p>
+</body>
+</html>
+EOF
