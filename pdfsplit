@@ -121,7 +121,11 @@ files=
 for i in scan*-*.pdf
 do
     bn=`basename $i .pdf`
-    pdftoppm -jpeg -r 30 $i $bn
+    res=$bn-1.jpg
+    if [ ! -f $res ] || [ $i -nt $res ]
+    then
+	pdftoppm -jpeg -r 30 $i $bn
+    fi
     if [ -z "$first" ]
     then
 	first=$bn-1.jpg
